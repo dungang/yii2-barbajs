@@ -14,6 +14,8 @@ use yii\web\Response;
 
 class BarbaWidget extends Widget
 {
+    public $barbaId = 'barba-wrapper';
+
     public $namespace = 'detail';
 
     public $prefetch = false;
@@ -32,46 +34,48 @@ class BarbaWidget extends Widget
             $view->beginPage();
             $view->head();
             $view->beginBody();
+            if ($view->title !== null) {
+                echo Html::tag('title', Html::encode($view->title));
+            }
         } else {
-            $this->options['class'] = isset($this->options['class'])
-                ? 'barba-container ' . $this->options['class']
-                : 'barba-container';
-            $this->options['data-namespace'] = $this->namespace;
-            echo '<div id="#barba-wrapper">'.Html::beginTag('div', $this->options);
         }
+        $this->options['class'] = isset($this->options['class'])
+            ? 'barba-container ' . $this->options['class']
+            : 'barba-container';
+        $this->options['data-namespace'] = $this->namespace;
+        echo '<div id="'.$this->barbaId.'">'.Html::beginTag('div', $this->options);
     }
     /**
      * @inheritdoc
      */
     public function run() {
 
-        if (!$this->requiresBarba()) {
-            echo '</div></div>';
-            $this->registerClientScript();
-            return;
+        echo '</div></div>';
+        $this->registerClientScript();
+
+        if ($this->requiresBarba()) {
+            $view = $this->getView();
+            $view->endBody();
+
+            // Do not re-send css files as it may override the css files that were loaded after them.
+            // This is a temporary fix for https://github.com/yiisoft/yii2/issues/2310
+            // It should be removed once pjax supports loading only missing css files
+            $view->cssFiles = null;
+
+            $view->endPage(true);
+
+            $content = ob_get_clean();
+
+            // only need the content enclosed within this widget
+            $response = \Yii::$app->getResponse();
+            $response->clearOutputBuffers();
+            $response->setStatusCode(200);
+            $response->format = Response::FORMAT_HTML;
+            $response->content = $content;
+            $response->send();
+
+            \Yii::$app->end();
         }
-
-        $view = $this->getView();
-        $view->endBody();
-
-        // Do not re-send css files as it may override the css files that were loaded after them.
-        // This is a temporary fix for https://github.com/yiisoft/yii2/issues/2310
-        // It should be removed once pjax supports loading only missing css files
-        $view->cssFiles = null;
-
-        $view->endPage(true);
-
-        $content = ob_get_clean();
-
-        // only need the content enclosed within this widget
-        $response = \Yii::$app->getResponse();
-        $response->clearOutputBuffers();
-        $response->setStatusCode(200);
-        $response->format = Response::FORMAT_HTML;
-        $response->content = $content;
-        $response->send();
-
-        \Yii::$app->end();
     }
 
     protected function registerClientScript() {
